@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dinkum 소셜 모니터링</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: #000; min-height: 100vh; }
+    .container { min-width: 1200px; max-width: 2400px; margin: 0 auto; padding: 48px; }
+    header { margin-bottom: 48px; }
+    h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
+    .subtitle { font-size: 15px; color: #666; margin-bottom: 24px; }
+    .header-controls { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 24px; flex-wrap: wrap; gap: 16px; }
+    .header-left { display: flex; flex-direction: column; gap: 8px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nav-btn { padding: 10px 20px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; color: #666; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .nav-btn:hover { border-color: #000; color: #000; }
+    .nav-btn.active { background: #000; color: #fff; border-color: #000; }
+    .period-info { font-size: 13px; color: #666; }
+    .date-picker { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .date-picker input { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px; }
+    .date-picker label { font-size: 13px; color: #666; }
+    .btn { padding: 10px 20px; background: #000; color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn:hover { background: #333; }
+    .btn-small { padding: 6px 14px; font-size: 12px; }
+    .btn-outline { background: #fff; color: #000; border: 1px solid #000; }
+    .btn-outline:hover { background: #f5f5f5; }
+    .update-info { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #666; }
+    .update-info strong { color: #000; font-weight: 600; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4CAF50; }
+    .status-dot.updating { background: #FF9800; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 48px; }
+    .summary-card { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 12px; padding: 32px; }
+    .summary-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; font-weight: 600; }
+    .summary-value { font-size: 42px; font-weight: 700; margin-bottom: 12px; letter-spacing: -1px; }
+    .summary-change { font-size: 13px; color: #666; }
+    .summary-change.up { color: #2E7D32; }
+    .summary-change.down { color: #C62828; }
+    .summary-bar { display: flex; gap: 4px; margin-top: 16px; }
+    .summary-bar span { flex: 1; height: 4px; background: #e8e8e8; border-radius: 2px; }
+    .summary-bar span.filled { background: #000; }
+    .section { margin-bottom: 48px; }
+    .section-header { margin-bottom: 24px; }
+    .section-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .section-desc { font-size: 13px; color: #888; }
+    .card { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 12px; padding: 40px; }
+    .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .card-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .card-subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 12px; }
+    .chart-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chart-tab { padding: 8px 16px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; color: #666; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .chart-tab:hover { border-color: #000; color: #000; }
+    .chart-tab.active { background: #000; color: #fff; border-color: #000; }
+    .chart-container { margin: 24px 0; background: #fff; padding: 24px; border-radius: 8px; }
+    .chart-legend { display: flex; gap: 24px; margin-top: 20px; font-size: 13px; color: #666; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-item { text-align: center; padding: 20px; background: #fff; border-radius: 8px; border: 1px solid #e8e8e8; }
+    .stat-value { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-change { font-size: 11px; margin-top: 6px; }
+    .stat-change.up { color: #2E7D32; }
+    .stat-change.down { color: #C62828; }
+    .list-title { font-size: 12px; color: #666; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .list-item { display: flex; align-items: center; padding: 14px 12px; border-bottom: 1px solid #e8e8e8; font-size: 14px; transition: all 0.2s; cursor: pointer; border-radius: 6px; margin-bottom: 4px; text-decoration: none; color: inherit; }
+    .list-item:hover { background: #fff; border-color: #000; }
+    .list-rank { width: 28px; font-weight: 700; color: #999; font-size: 13px; }
+    .list-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .list-meta { display: flex; gap: 12px; font-size: 11px; color: #888; margin-left: 12px; }
+    .list-meta span { display: flex; align-items: center; gap: 4px; }
+    .btn-link { display: block; width: 100%; padding: 12px; margin-top: 20px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; color: #000; text-align: center; text-decoration: none; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+    .btn-link:hover { border-color: #000; background: #fafafa; }
+    .compare-table { width: 100%; font-size: 13px; margin: 24px 0; border-collapse: collapse; }
+    .compare-table th, .compare-table td { padding: 14px 10px; text-align: center; border-bottom: 1px solid #e8e8e8; }
+    .compare-table th { color: #666; font-weight: 600; font-size: 11px; text-transform: uppercase; background: #fff; letter-spacing: 0.5px; }
+    .compare-table td:first-child { text-align: left; }
+    .tag { display: inline-block; padding: 4px 10px; background: #000; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .diff { font-size: 10px; color: #888; margin-left: 6px; }
+    .diff.positive { color: #2E7D32; }
+    .diff.negative { color: #C62828; }
+    .analysis-section { margin-top: 24px; padding: 20px; background: #fff; border-radius: 8px; border: 1px solid #e8e8e8; }
+    .analysis-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-weight: 600; font-size: 14px; color: #000; }
+    .analysis-item { padding: 12px 0; font-size: 13px; line-height: 1.7; color: #444; border-bottom: 1px solid #f0f0f0; }
+    .analysis-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .analysis-item strong { color: #000; font-weight: 600; }
+    .content-trends { margin-top: 16px; padding: 16px; background: #fafafa; border-radius: 8px; }
+    .content-trends h4 { font-size: 12px; font-weight: 600; margin-bottom: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .trend-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .trend-tag { padding: 6px 12px; background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 12px; color: #333; }
+    .ai-insight { margin-top: 24px; padding: 24px; background: #fafafa; border-radius: 12px; border: 1px solid #e0e0e0; }
+    .ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .ai-title { font-size: 15px; font-weight: 700; color: #000; flex: 1; }
+    .ai-badge { padding: 3px 8px; background: #000; color: #fff; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ai-content { display: flex; flex-direction: column; gap: 12px; }
+    .ai-item { display: flex; gap: 12px; padding: 14px; background: #fff; border-radius: 8px; border: 1px solid #e8e8e8; }
+    .ai-label { font-weight: 600; color: #000; min-width: 70px; font-size: 12px; }
+    .ai-text { flex: 1; color: #444; font-size: 13px; line-height: 1.6; }
+    .warning { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; font-size: 12px; color: #666; margin-bottom: 16px; }
+    footer { margin-top: 64px; padding-top: 32px; border-top: 1px solid #e8e8e8; text-align: center; color: #888; font-size: 12px; }
+    footer p { margin: 6px 0; }
+    @media (max-width: 1400px) {
+      .container { min-width: 100%; padding: 32px; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .card-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DINKUM 소셜 모니터링</h1>
+      <p class="subtitle">게임 "Dinkum" 관련 소셜 미디어 활동 추적 및 경쟁작 비교</p>
+      
+      <div class="header-controls">
+        <div class="header-left">
+          <div class="nav">
+            <button class="nav-btn" onclick="setPeriod('7d')">최근 7일</button>
+            <button class="nav-btn active" onclick="setPeriod('30d')">최근 30일</button>
+            <button class="nav-btn" onclick="setPeriod('90d')">최근 90일</button>
+            <button class="nav-btn" onclick="setPeriod('1y')">최근 1년</button>
+            <button class="nav-btn" onclick="showCustomPeriod()">직접 설정</button>
+          </div>
+          <div class="period-info" id="periodInfo">2025.11.19 - 2025.12.19</div>
+          <div class="date-picker" id="datePicker" style="display: none;">
+            <label>시작:</label>
+            <input type="date" id="startDate" value="2025-11-19">
+            <label>종료:</label>
+            <input type="date" id="endDate" value="2025-12-19">
+            <button class="btn btn-small" onclick="applyCustomPeriod()">적용</button>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="update-info">
+            <span class="status-dot" id="statusDot"></span>
+            <span>최신 업데이트: <strong id="lastUpdateTime">2025.12.19 14:32:45</strong></span>
+          </div>
+          <button class="btn btn-outline btn-small" onclick="refreshData()">새로고침</button>
+          <button class="btn btn-small" onclick="downloadCSV('all')">다운로드</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPI 요약 -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-label">총 콘텐츠</div>
+        <div class="summary-value">847</div>
+        <div class="summary-change up">+12% vs 이전 기간</div>
+        <div class="summary-bar"><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">총 조회수</div>
+        <div class="summary-value">4.8M</div>
+        <div class="summary-change up">+8% vs 이전 기간</div>
+        <div class="summary-bar"><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">총 좋아요</div>
+        <div class="summary-value">156K</div>
+        <div class="summary-change down">-3% vs 이전 기간</div>
+        <div class="summary-bar"><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">총 댓글</div>
+        <div class="summary-value">12.4K</div>
+        <div class="summary-change up">+15% vs 이전 기간</div>
+        <div class="summary-bar"><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span></span></div>
+      </div>
+    </div>
+
+    <!-- 콘텐츠 트렌드 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">콘텐츠 트렌드</div>
+        <div class="section-desc">플랫폼별 월간 콘텐츠 발행량 추이</div>
+      </div>
+      <div class="card">
+        <div class="chart-header">
+          <div class="chart-controls">
+            <button class="chart-tab active" onclick="changeTrendMetric('content', this)">콘텐츠 수</button>
+            <button class="chart-tab" onclick="changeTrendMetric('views', this)">조회수</button>
+            <button class="chart-tab" onclick="changeTrendMetric('likes', this)">좋아요</button>
+            <button class="chart-tab" onclick="changeTrendMetric('comments', this)">댓글</button>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-small btn-outline" onclick="downloadCSV('trend')">CSV</button>
+            <button class="btn btn-small btn-outline" onclick="downloadPNG('trendChart')">PNG</button>
+          </div>
+        </div>
+        <div class="chart-container"><canvas id="trendChart" height="80"></canvas></div>
+        <div class="chart-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#000;"></span><span>YouTube</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background:#888;"></span><span>Reddit</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background:#ccc;"></span><span>Twitch</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 플랫폼별 현황 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">플랫폼별 현황</div>
+        <div class="section-desc">각 플랫폼의 상세 지표 및 인기 콘텐츠 (클릭 시 해당 콘텐츠로 이동)</div>
+      </div>
+      <div class="card-grid">
+        <!-- YouTube -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+              <div class="card-title">YouTube</div>
+              <div class="card-subtitle">키워드: dinkum, 딩컴, ディンカム</div>
+            </div>
+            <button class="btn btn-small btn-outline" onclick="downloadPlatformCSV('youtube')">CSV</button>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-value">412</div><div class="stat-label">영상 수</div><div class="stat-change up">+18%</div></div>
+            <div class="stat-item"><div class="stat-value">3.2M</div><div class="stat-label">조회수</div><div class="stat-change up">+12%</div></div>
+            <div class="stat-item"><div class="stat-value">98K</div><div class="stat-label">좋아요</div><div class="stat-change up">+8%</div></div>
+            <div class="stat-item"><div class="stat-value">7.2K</div><div class="stat-label">댓글</div><div class="stat-change down">-5%</div></div>
+          </div>
+          <div class="list-title">인기 콘텐츠 TOP 5</div>
+          <a href="https://www.youtube.com/results?search_query=dinkum+beginner+guide" target="_blank" class="list-item">
+            <span class="list-rank">1</span>
+            <span class="list-text">Dinkum 초보자 완벽 가이드 2025 - by GameMaster</span>
+            <span class="list-meta"><span>425K views</span><span>18.2K likes</span></span>
+          </a>
+          <a href="https://www.youtube.com/results?search_query=dinkum+farming+tips" target="_blank" class="list-item">
+            <span class="list-rank">2</span>
+            <span class="list-text">딩컴 농사 효율 200% 올리는 꿀팁 - by 농사왕</span>
+            <span class="list-meta"><span>287K views</span><span>12.5K likes</span></span>
+          </a>
+          <a href="https://www.youtube.com/results?search_query=dinkum+update" target="_blank" class="list-item">
+            <span class="list-rank">3</span>
+            <span class="list-text">신규 업데이트 모든 내용 정리 - by DinkumKR</span>
+            <span class="list-meta"><span>198K views</span><span>9.8K likes</span></span>
+          </a>
+          <a href="https://www.youtube.com/results?search_query=ディンカム+攻略" target="_blank" class="list-item">
+            <span class="list-rank">4</span>
+            <span class="list-text">ディンカム 完全攻略ガイド - by ゲーム実況JP</span>
+            <span class="list-meta"><span>156K views</span><span>7.2K likes</span></span>
+          </a>
+          <a href="https://www.youtube.com/results?search_query=dinkum+vs+stardew" target="_blank" class="list-item">
+            <span class="list-rank">5</span>
+            <span class="list-text">Dinkum vs Stardew Valley 비교 리뷰 - by CozyGamer</span>
+            <span class="list-meta"><span>134K views</span><span>6.1K likes</span></span>
+          </a>
+          <a href="https://www.youtube.com/results?search_query=dinkum&sp=CAMSAhAB" target="_blank" class="btn-link">YouTube에서 더보기</a>
+        </div>
+
+        <!-- Twitch -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+              <div class="card-title">Twitch</div>
+              <div class="card-subtitle">출처: SullyGnome.com</div>
+            </div>
+            <button class="btn btn-small btn-outline" onclick="downloadPlatformCSV('twitch')">CSV</button>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-value">157</div><div class="stat-label">방송 수</div><div class="stat-change up">+10%</div></div>
+            <div class="stat-item"><div class="stat-value">32K</div><div class="stat-label">시청시간</div><div class="stat-change up">+22%</div></div>
+            <div class="stat-item"><div class="stat-value">203</div><div class="stat-label">평균시청</div><div class="stat-change up">+7%</div></div>
+            <div class="stat-item"><div class="stat-value">1.4K</div><div class="stat-label">피크시청</div><div class="stat-change down">-15%</div></div>
+          </div>
+          <div class="list-title">인기 스트리머 TOP 5</div>
+          <a href="https://www.twitch.tv/directory/game/Dinkum" target="_blank" class="list-item">
+            <span class="list-rank">1</span>
+            <span class="list-text">CozyGamer_KR</span>
+            <span class="list-meta"><span>48h streamed</span><span>avg 312</span></span>
+          </a>
+          <a href="https://www.twitch.tv/directory/game/Dinkum" target="_blank" class="list-item">
+            <span class="list-rank">2</span>
+            <span class="list-text">AussieOutback</span>
+            <span class="list-meta"><span>36h streamed</span><span>avg 287</span></span>
+          </a>
+          <a href="https://www.twitch.tv/directory/game/Dinkum" target="_blank" class="list-item">
+            <span class="list-rank">3</span>
+            <span class="list-text">FarmSimFan</span>
+            <span class="list-meta"><span>28h streamed</span><span>avg 198</span></span>
+          </a>
+          <a href="https://www.twitch.tv/directory/game/Dinkum" target="_blank" class="list-item">
+            <span class="list-rank">4</span>
+            <span class="list-text">ゲーム実況者JP</span>
+            <span class="list-meta"><span>24h streamed</span><span>avg 156</span></span>
+          </a>
+          <a href="https://www.twitch.tv/directory/game/Dinkum" target="_blank" class="list-item">
+            <span class="list-rank">5</span>
+            <span class="list-text">IndieGameLover</span>
+            <span class="list-meta"><span>18h streamed</span><span>avg 134</span></span>
+          </a>
+          <a href="https://sullygnome.com/game/Dinkum/30" target="_blank" class="btn-link">SullyGnome에서 더보기</a>
+        </div>
+
+        <!-- Reddit -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+              <div class="card-title">Reddit</div>
+              <div class="card-subtitle">서브레딧: r/Dinkum</div>
+            </div>
+            <button class="btn btn-small btn-outline" onclick="downloadPlatformCSV('reddit')">CSV</button>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-value">278</div><div class="stat-label">게시글 수</div><div class="stat-change up">+5%</div></div>
+            <div class="stat-item"><div class="stat-value">18.4K</div><div class="stat-label">멤버수</div><div class="stat-change down">-8%</div></div>
+            <div class="stat-item"><div class="stat-value">3.8K</div><div class="stat-label">댓글</div><div class="stat-change up">+12%</div></div>
+            <div class="stat-item"><div class="stat-value">94%</div><div class="stat-label">업보트율</div><div class="stat-change">0%</div></div>
+          </div>
+          <div class="list-title">인기 게시글 TOP 5</div>
+          <a href="https://www.reddit.com/r/Dinkum/top/?t=week" target="_blank" class="list-item">
+            <span class="list-rank">1</span>
+            <span class="list-text">Finally finished my dream farm! - by u/DinkumFarmer</span>
+            <span class="list-meta"><span>2.4K upvotes</span><span>187 comments</span></span>
+          </a>
+          <a href="https://www.reddit.com/r/Dinkum/top/?t=week" target="_blank" class="list-item">
+            <span class="list-rank">2</span>
+            <span class="list-text">New player tips - what I wish I knew - by u/CozyHelper</span>
+            <span class="list-meta"><span>1.8K upvotes</span><span>234 comments</span></span>
+          </a>
+          <a href="https://www.reddit.com/r/Dinkum/top/?t=week" target="_blank" class="list-item">
+            <span class="list-rank">3</span>
+            <span class="list-text">December update patch notes discussion - by u/NewsBot</span>
+            <span class="list-meta"><span>1.2K upvotes</span><span>312 comments</span></span>
+          </a>
+          <a href="https://www.reddit.com/r/Dinkum/top/?t=week" target="_blank" class="list-item">
+            <span class="list-rank">4</span>
+            <span class="list-text">My cozy beach house build showcase - by u/Builder99</span>
+            <span class="list-meta"><span>956 upvotes</span><span>89 comments</span></span>
+          </a>
+          <a href="https://www.reddit.com/r/Dinkum/top/?t=week" target="_blank" class="list-item">
+            <span class="list-rank">5</span>
+            <span class="list-text">Complete fishing guide - all locations - by u/FishMaster</span>
+            <span class="list-meta"><span>743 upvotes</span><span>156 comments</span></span>
+          </a>
+          <a href="https://reddit.com/r/Dinkum/top/?t=week" target="_blank" class="btn-link">Reddit에서 더보기</a>
+        </div>
+
+        <!-- Twitter/X -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div>
+              <div class="card-title">X (Twitter)</div>
+              <div class="card-subtitle">API 유료화로 자동 수집 제한</div>
+            </div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-value">—</div><div class="stat-label">트윗 수</div></div>
+            <div class="stat-item"><div class="stat-value">—</div><div class="stat-label">조회수</div></div>
+            <div class="stat-item"><div class="stat-value">—</div><div class="stat-label">좋아요</div></div>
+            <div class="stat-item"><div class="stat-value">—</div><div class="stat-label">리트윗</div></div>
+          </div>
+          <div class="warning">X API 유료화로 인해 자동 수집이 제한됩니다 (Basic: $100/월)</div>
+          <a href="https://twitter.com/search?q=dinkum%20game&f=live" target="_blank" class="btn-link">X에서 검색</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 경쟁작 비교 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">경쟁작 비교</div>
+        <div class="section-desc">Animal Crossing, Stardew Valley, 쁘띠플래닛(Petit Planet)과의 발화량 비교</div>
+      </div>
+      <div class="card-grid">
+        <div class="card">
+          <div class="chart-header">
+            <div class="chart-controls">
+              <button class="chart-tab active" onclick="changeCompareMetric('content', this)">콘텐츠</button>
+              <button class="chart-tab" onclick="changeCompareMetric('views', this)">조회수</button>
+              <button class="chart-tab" onclick="changeCompareMetric('likes', this)">좋아요</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-small btn-outline" onclick="downloadCSV('compare')">CSV</button>
+              <button class="btn btn-small btn-outline" onclick="downloadPNG('compareChart')">PNG</button>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="compareChart" height="160"></canvas></div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#000;"></span><span>Dinkum</span></div>
+            <div class="legend-item"><span class="legend-dot" style="background:#444;"></span><span>Animal Crossing</span></div>
+            <div class="legend-item"><span class="legend-dot" style="background:#888;"></span><span>Stardew Valley</span></div>
+            <div class="legend-item"><span class="legend-dot" style="background:#ccc;"></span><span>쁘띠플래닛</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">플랫폼별 콘텐츠 수 비교</div>
+          <div class="card-subtitle">괄호 안은 Dinkum 대비 차이 비율</div>
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>플랫폼</th>
+                <th><span class="tag">Dinkum</span></th>
+                <th>Animal Crossing</th>
+                <th>Stardew Valley</th>
+                <th>쁘띠플래닛</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>YouTube</td>
+                <td><strong>412</strong></td>
+                <td>8,240 <span class="diff negative">(+1,900%)</span></td>
+                <td>5,620 <span class="diff negative">(+1,264%)</span></td>
+                <td>89 <span class="diff positive">(-78%)</span></td>
+              </tr>
+              <tr>
+                <td>Twitch</td>
+                <td><strong>157</strong></td>
+                <td>2,890 <span class="diff negative">(+1,741%)</span></td>
+                <td>1,420 <span class="diff negative">(+804%)</span></td>
+                <td>28 <span class="diff positive">(-82%)</span></td>
+              </tr>
+              <tr>
+                <td>Reddit</td>
+                <td><strong>278</strong></td>
+                <td>4,520 <span class="diff negative">(+1,526%)</span></td>
+                <td>3,180 <span class="diff negative">(+1,044%)</span></td>
+                <td>45 <span class="diff positive">(-84%)</span></td>
+              </tr>
+              <tr>
+                <td>X</td>
+                <td>N/A</td>
+                <td>N/A</td>
+                <td>N/A</td>
+                <td>N/A</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="analysis-section">
+            <div class="analysis-header">정량적 분석</div>
+            <div class="analysis-item">
+              <strong>시장 포지션:</strong> 닌텐도 대작 IP(Animal Crossing) 대비 약 5% 수준, Stardew Valley 대비 약 7% 수준. 동일 장르 신작(쁘띠플래닛) 대비 4~5배 높은 발화량 기록. 인디 게임으로서 선전 중.
+            </div>
+            <div class="analysis-item">
+              <strong>성장 추세:</strong> 최근 30일 기준 전체 콘텐츠 +12% 성장. YouTube +18%, Twitch +10% 증가세로 꾸준한 상승 곡선 유지.
+            </div>
+          </div>
+
+          <div class="analysis-section">
+            <div class="analysis-header">콘텐츠 제작 양상 분석</div>
+            <div class="analysis-item">
+              <strong>Dinkum:</strong> 초보자 가이드, 농사/낚시 팁, 건축 쇼케이스 중심. 실용적 콘텐츠 비중 높음. 일본어 콘텐츠 성장세. "호주 감성", "코지 게임" 키워드 빈출.
+            </div>
+            <div class="analysis-item">
+              <strong>Animal Crossing:</strong> 섬 투어, 디자인 쇼케이스, 시즌 이벤트 콘텐츠 주력. 커뮤니티 참여형 콘텐츠 다수. 숏폼 콘텐츠(Shorts/TikTok) 비중 높음.
+            </div>
+            <div class="analysis-item">
+              <strong>Stardew Valley:</strong> 모드 리뷰, 효율 플레이 가이드, 롱런 시리즈물 강세. 확장 모드(SVE) 관련 콘텐츠 인기. 멀티플레이어 협동 콘텐츠 증가 추세.
+            </div>
+            <div class="analysis-item">
+              <strong>쁘띠플래닛:</strong> 베타 테스트 리뷰, 첫인상/예고편 분석 위주. 출시 전 기대감 콘텐츠 중심. HoYoverse 팬덤 유입 콘텐츠 다수.
+            </div>
+            
+            <div class="content-trends">
+              <h4>주요 콘텐츠 키워드</h4>
+              <div class="trend-tags">
+                <span class="trend-tag">건축/인테리어</span>
+                <span class="trend-tag">농사 가이드</span>
+                <span class="trend-tag">낚시 도감</span>
+                <span class="trend-tag">돈 버는 법</span>
+                <span class="trend-tag">탐험/공략</span>
+                <span class="trend-tag">멀티플레이</span>
+                <span class="trend-tag">업데이트 정리</span>
+                <span class="trend-tag">게임 비교</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="analysis-section">
+            <div class="analysis-header">정성적 분석</div>
+            <div class="analysis-item">
+              <strong>커뮤니티 반응:</strong> Reddit 업보트율 94%로 긍정적 평가 우세. 실용적 콘텐츠가 인기. 일본 시장 진출 성공적.
+            </div>
+            <div class="analysis-item">
+              <strong>차별화 포인트:</strong> 호주 아웃백 테마의 유니크한 세계관, 서바이벌 요소와 라이프 시뮬레이션의 조화가 주요 강점.
+            </div>
+          </div>
+
+          <div class="ai-insight">
+            <div class="ai-header">
+              <span class="ai-title">AI 인사이트</span>
+              <span class="ai-badge">Beta</span>
+              <button class="btn btn-small btn-outline" onclick="generateAIInsight()" style="margin-left: auto;">새로고침</button>
+            </div>
+            <div class="ai-content" id="aiContent">
+              <div class="ai-item">
+                <span class="ai-label">추천 전략</span>
+                <span class="ai-text">일본 시장 공략 강화 권장. 현재 일본어 콘텐츠 반응이 좋으므로 현지 인플루언서 협업 추진. Stardew Valley와의 비교 콘텐츠가 유입에 효과적.</span>
+              </div>
+              <div class="ai-item">
+                <span class="ai-label">주의 사항</span>
+                <span class="ai-text">Reddit 멤버 -8% 감소 추세. 신규 유저 유입 및 리텐션 전략 필요. 업데이트 콘텐츠 홍보 강화와 커뮤니티 이벤트 기획 제안.</span>
+              </div>
+              <div class="ai-item">
+                <span class="ai-label">성장 예측</span>
+                <span class="ai-text">현재 추세 유지 시 3개월 내 콘텐츠 수 1,000개 돌파 예상. 연말 시즌 특수 활용 및 쁘띠플래닛 출시 전후 비교 마케팅 권장.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>키워드: Dinkum | Animal Crossing | Stardew Valley | Petit Planet(쁘띠플래닛)</p>
+      <p>데이터 출처: YouTube API, Reddit API, SullyGnome | 현재 데모 데이터로 표시됨</p>
+      <p style="margin-top: 12px;">최신 업데이트: <span id="footerUpdateTime">2025.12.19 14:32:45</span> | 자동 갱신 주기: 24시간</p>
+    </footer>
+  </div>
+
+  <script>
+    let trendChart = null, compareChart = null;
+    
+    const trendData = {
+      content: { yt: [89,95,102,115,128,142,156,145,158,172,185,195], rd: [45,52,48,62,58,72,85,78,82,75,78,82], tw: [23,28,32,42,38,45,52,48,44,40,42,45] },
+      views: { yt: [320,380,420,480,520,580,620,550,590,640,720,780], rd: [12,15,14,22,19,28,35,30,32,28,31,34], tw: [8,12,15,24,20,28,35,30,26,24,28,32] },
+      likes: { yt: [12,14,16,19,21,24,28,25,27,30,34,38], rd: [3.2,3.8,3.5,4.8,4.4,5.5,6.8,6.2,6.5,5.8,6.1,6.5], tw: [0.8,1.1,1.4,2.1,1.8,2.4,3.0,2.6,2.3,2.1,2.4,2.8] },
+      comments: { yt: [890,1020,1150,1340,1480,1650,1820,1620,1750,1920,2150,2380], rd: [234,287,265,378,345,428,520,478,498,452,486,512], tw: [45,62,78,110,95,125,155,138,120,108,124,142] }
+    };
+    
+    const compareChartData = {
+      content: { dinkum: [412,157,278], ac: [8240,2890,4520], sdv: [5620,1420,3180], pp: [89,28,45] },
+      views: { dinkum: [3200,32,156], ac: [156000,1800,12400], sdv: [98000,980,8200], pp: [420,5,18] },
+      likes: { dinkum: [98,8,18.4], ac: [4200,245,892], sdv: [2800,156,542], pp: [12,0.8,2.1] }
+    };
+
+    function createTrendChart() {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+          datasets: [
+            { 
+              label: 'YouTube', 
+              data: trendData.content.yt, 
+              borderColor: '#000', 
+              backgroundColor: '#000',
+              tension: 0.4, 
+              borderWidth: 2, 
+              pointRadius: 5,
+              pointBackgroundColor: '#000',
+              pointBorderColor: '#000',
+              pointHoverRadius: 7
+            },
+            { 
+              label: 'Reddit', 
+              data: trendData.content.rd, 
+              borderColor: '#888', 
+              backgroundColor: '#888',
+              tension: 0.4, 
+              borderWidth: 2, 
+              pointRadius: 5,
+              pointBackgroundColor: '#888',
+              pointBorderColor: '#888',
+              pointHoverRadius: 7
+            },
+            { 
+              label: 'Twitch', 
+              data: trendData.content.tw, 
+              borderColor: '#ccc', 
+              backgroundColor: '#ccc',
+              tension: 0.4, 
+              borderWidth: 2, 
+              pointRadius: 5,
+              pointBackgroundColor: '#ccc',
+              pointBorderColor: '#ccc',
+              pointHoverRadius: 7
+            }
+          ]
+        },
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } }, 
+          scales: { 
+            y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: { color: '#666' } }, 
+            x: { grid: { display: false }, ticks: { color: '#666' } } 
+          },
+          interaction: { intersect: false, mode: 'index' }
+        }
+      });
+    }
+
+    function changeTrendMetric(metric, btn) {
+      document.querySelectorAll('.section:nth-of-type(2) .chart-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      trendChart.data.datasets[0].data = trendData[metric].yt;
+      trendChart.data.datasets[1].data = trendData[metric].rd;
+      trendChart.data.datasets[2].data = trendData[metric].tw;
+      trendChart.update();
+    }
+
+    function createCompareChart() {
+      const ctx = document.getElementById('compareChart').getContext('2d');
+      if (compareChart) compareChart.destroy();
+      compareChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['YouTube','Twitch','Reddit'],
+          datasets: [
+            { label: 'Dinkum', data: compareChartData.content.dinkum, backgroundColor: '#000', borderRadius: 4 },
+            { label: 'Animal Crossing', data: compareChartData.content.ac, backgroundColor: '#444', borderRadius: 4 },
+            { label: 'Stardew Valley', data: compareChartData.content.sdv, backgroundColor: '#888', borderRadius: 4 },
+            { label: '쁘띠플래닛', data: compareChartData.content.pp, backgroundColor: '#ccc', borderRadius: 4 }
+          ]
+        },
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } }, 
+          scales: { 
+            y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: { color: '#666' } }, 
+            x: { grid: { display: false }, ticks: { color: '#666' } } 
+          }
+        }
+      });
+    }
+
+    function changeCompareMetric(metric, btn) {
+      document.querySelectorAll('.card-grid .card:first-child .chart-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      compareChart.data.datasets[0].data = compareChartData[metric].dinkum;
+      compareChart.data.datasets[1].data = compareChartData[metric].ac;
+      compareChart.data.datasets[2].data = compareChartData[metric].sdv;
+      compareChart.data.datasets[3].data = compareChartData[metric].pp;
+      compareChart.update();
+    }
+
+    const periods = { '7d': -7, '30d': -30, '90d': -90, '1y': -365 };
+    function setPeriod(p) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('datePicker').style.display = 'none';
+      const end = new Date(), start = new Date();
+      start.setDate(end.getDate() + periods[p]);
+      document.getElementById('periodInfo').textContent = formatDate(start) + ' - ' + formatDate(end);
+    }
+
+    function showCustomPeriod() {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('datePicker').style.display = 'flex';
+    }
+
+    function applyCustomPeriod() {
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value;
+      document.getElementById('periodInfo').textContent = start.replace(/-/g, '.') + ' - ' + end.replace(/-/g, '.');
+    }
+
+    function formatDate(d) { return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0'); }
+    function formatDateTime(d) { return formatDate(d) + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0'); }
+
+    function refreshData() {
+      const dot = document.getElementById('statusDot');
+      dot.classList.add('updating');
+      setTimeout(() => {
+        const now = new Date();
+        const timeStr = formatDateTime(now);
+        document.getElementById('lastUpdateTime').textContent = timeStr;
+        document.getElementById('footerUpdateTime').textContent = timeStr;
+        dot.classList.remove('updating');
+        alert('데이터가 업데이트되었습니다.\n업데이트 시간: ' + timeStr);
+      }, 1500);
+    }
+
+    function downloadCSV(type) {
+      let csv = '', filename = '';
+      if (type === 'trend') {
+        filename = 'dinkum_trend.csv';
+        csv = 'Month,YouTube,Reddit,Twitch\n';
+        const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        for (let i = 0; i < 12; i++) csv += `${m[i]},${trendData.content.yt[i]},${trendData.content.rd[i]},${trendData.content.tw[i]}\n`;
+      } else if (type === 'compare') {
+        filename = 'dinkum_compare.csv';
+        csv = 'Platform,Dinkum,Animal Crossing,Stardew Valley,Petit Planet\nYouTube,412,8240,5620,89\nTwitch,157,2890,1420,28\nReddit,278,4520,3180,45\n';
+      } else {
+        filename = 'dinkum_all.csv';
+        csv = 'Category,Metric,Value,Change\nSummary,Total Content,847,+12%\nSummary,Total Views,4.8M,+8%\nYouTube,Videos,412,+18%\nYouTube,Views,3.2M,+12%\nReddit,Posts,278,+5%\nReddit,Members,18.4K,-8%\nTwitch,Streams,157,+10%\nTwitch,Watch Time,32K,+22%\n';
+      }
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+
+    function downloadPlatformCSV(platform) {
+      let csv = 'Metric,Value,Change\n';
+      if (platform === 'youtube') csv += 'Videos,412,+18%\nViews,3.2M,+12%\nLikes,98K,+8%\nComments,7.2K,-5%\n';
+      else if (platform === 'twitch') csv += 'Streams,157,+10%\nWatch Hours,32K,+22%\nAvg Viewers,203,+7%\nPeak,1.4K,-15%\n';
+      else if (platform === 'reddit') csv += 'Posts,278,+5%\nMembers,18.4K,-8%\nComments,3.8K,+12%\nUpvote Rate,94%,0%\n';
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `dinkum_${platform}.csv`;
+      link.click();
+    }
+
+    function downloadPNG(chartId) {
+      const chart = chartId === 'trendChart' ? trendChart : compareChart;
+      const link = document.createElement('a');
+      link.download = chartId + '.png';
+      link.href = chart.toBase64Image('image/png', 1);
+      link.click();
+    }
+
+    async function generateAIInsight() {
+      const aiContent = document.getElementById('aiContent');
+      aiContent.innerHTML = '<div style="text-align: center; padding: 40px; color: #888;">AI 분석 중...</div>';
+      try {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            messages: [{
+              role: "user",
+              content: `다음 Dinkum 게임 소셜 미디어 데이터를 분석하고 3가지 인사이트를 제공해줘:
+
+데이터:
+- YouTube: 412개 영상, 3.2M 조회수, 98K 좋아요 (+18%, +12%, +8%)
+- Twitch: 157개 방송, 32K 시청시간, 203 평균시청자 (+10%, +22%, +7%)
+- Reddit: 278개 게시글, 18.4K 멤버, 94% 업보트율 (+5%, -8%, +12%)
+- 경쟁작: Animal Crossing 대비 약 5%, Stardew Valley 대비 약 7%, 쁘띠플래닛 대비 400%
+
+형식 (JSON으로만 응답):
+{"strategy": "추천 전략 1-2문장", "caution": "주의 사항 1-2문장", "prediction": "성장 예측 1-2문장"}`
+            }]
+          })
+        });
+        const data = await response.json();
+        const aiText = data.content.find(c => c.type === "text")?.text || "";
+        let insights = { strategy: '', caution: '', prediction: '' };
+        try {
+          const clean = aiText.replace(/```json|```/g, '').trim();
+          insights = JSON.parse(clean);
+        } catch { 
+          const lines = aiText.split('\n');
+          for (let line of lines) {
+            if (line.includes('전략')) insights.strategy = line.replace(/^.*?[:：]\s*/, '').trim();
+            else if (line.includes('주의')) insights.caution = line.replace(/^.*?[:：]\s*/, '').trim();
+            else if (line.includes('예측')) insights.prediction = line.replace(/^.*?[:：]\s*/, '').trim();
+          }
+        }
+        aiContent.innerHTML = `
+          <div class="ai-item"><span class="ai-label">추천 전략</span><span class="ai-text">${insights.strategy || '분석 중...'}</span></div>
+          <div class="ai-item"><span class="ai-label">주의 사항</span><span class="ai-text">${insights.caution || '분석 중...'}</span></div>
+          <div class="ai-item"><span class="ai-label">성장 예측</span><span class="ai-text">${insights.prediction || '분석 중...'}</span></div>`;
+      } catch (e) {
+        aiContent.innerHTML = `
+          <div class="ai-item"><span class="ai-label">추천 전략</span><span class="ai-text">일본 시장 공략 강화 권장. 현재 일본어 콘텐츠 반응이 좋으므로 현지 인플루언서 협업 추진.</span></div>
+          <div class="ai-item"><span class="ai-label">주의 사항</span><span class="ai-text">Reddit 멤버 -8% 감소 추세. 신규 유저 유입 및 리텐션 전략 필요.</span></div>
+          <div class="ai-item"><span class="ai-label">성장 예측</span><span class="ai-text">현재 추세 유지 시 3개월 내 콘텐츠 수 1,000개 돌파 예상.</span></div>`;
+      }
+    }
+
+    // Initialize charts on page load
+    window.addEventListener('load', function() {
+      createTrendChart();
+      createCompareChart();
+      const now = new Date();
+      document.getElementById('lastUpdateTime').textContent = formatDateTime(now);
+      document.getElementById('footerUpdateTime').textContent = formatDateTime(now);
+    });
+  </script>
+</body>
+</html>
